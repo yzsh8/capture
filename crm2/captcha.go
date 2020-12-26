@@ -29,7 +29,7 @@ func NewCaptcha( /*image image.Image,*/ threshold, n int) *Captcha {
 }
 
 // 通用二值化
-func (c *Captcha) Binarify(img image.Image) BinaryImage {
+func (c *Captcha) Binarify(img image.Image) *BinaryImage {
 	// 去除1px边缘
 	h := img.Bounds().Dy() - 2
 	w := img.Bounds().Dx() - 2
@@ -52,7 +52,9 @@ func (c *Captcha) Binarify(img image.Image) BinaryImage {
 			}
 		}
 	}
-	return BinaryImage(binimg)
+	newBi := new(BinaryImage)
+	newBi.Bin = binimg
+	return newBi
 }
 
 // !panic 二值化并 切割并复制子区域
@@ -207,7 +209,7 @@ func (c *Captcha) autoFindMatchest(binimges []BinaryImage) int {
 	// 指纹序列长度频数序列
 	lenseq := make(map[int]int) // 这里如果使用俩slice代替map,生成norLseq就可以生一次遍历len()
 	for i := 0; i < bl; i++ {
-		h, w := len(binimges[i]), len(binimges[i][0]) // !panic empty bi
+		h, w := len(binimges[i].Bin), len(binimges[i].Bin[0]) // !panic empty bi
 		fpseq[i] = binimges[i].FingerPrint(h, w)
 		tl := len(fpseq[i])
 		if _, ok := lenseq[tl]; ok {
@@ -291,16 +293,27 @@ func (c *Captcha) Train(capimgs []image.Image, trainFile interface{}) (map[Alpha
 
 	r := bufio.NewReader(os.Stdin)
 	for i, l := 0, len(capimgs); i < l; i++ {
-
+		//二进制区域
 		capbinimg := c.Binarify(capimgs[i])
 
 		fmt.Println(capbinimg)
+
+		//切割区域
+		binimges := capbinimg.CropSubImgNoPanic(c.N)
+
+		if binimges == nil {
+			fmt.Println("crop failed,next")
+			continue
+		}
+
 		fmt.Println("enter captcha: ")
 
 	input:
-		captch, err := r.ReadSlice('\n')
-		//fmt.Println(len(captch)) // 8 = 6+ \n \ r
-		if len(captch) != (c.N + 2) {
+		captch, err := r.ReadBytes('\n')
+
+		fmt.Println(captch, len(captch))
+
+		if len(captch) != (c.N + 1) {
 			fmt.Println("len(captch) != c.N")
 			goto input
 		}
@@ -308,12 +321,7 @@ func (c *Captcha) Train(capimgs []image.Image, trainFile interface{}) (map[Alpha
 			fmt.Println(err)
 			goto input
 		}
-		binimges := capbinimg.CropSubImgNoPanic(c.N)
 
-		if binimges == nil {
-			fmt.Println("crop failed,next")
-			continue
-		}
 		// 将输入的验证码与crop关联存入训练module
 		for n := 0; n < c.N; n++ {
 			alpha := Alpha(captch[n])

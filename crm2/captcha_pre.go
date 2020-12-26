@@ -6,9 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
-	"io"
 	"os"
-	"strconv"
 )
 
 const CAPURL = `http://om.jd.com/auth_authImg`
@@ -17,42 +15,6 @@ var (
 	white = color.RGBA{255, 255, 255, 255}
 	black = color.RGBA{0, 0, 0, 255}
 )
-
-// 下载n个验证码到文件夹
-func DownCaptcha(dir string, n int) error {
-	crm := New(TEST_ERP, TEST_PWD, n, 23000)
-	err := crm.SetProxy(TEST_PROXY)
-	if err != nil {
-		return err
-	}
-	err = crm.Login()
-	if err != nil {
-		return err
-	}
-
-	ch := make(chan int, n)
-	for i := 0; i < n; i++ {
-		ch <- i
-	}
-
-	MultiTaskDone(n, func() {
-		f, err := os.Create(dir + strconv.Itoa(<-ch) + ".jpg")
-		if err != nil {
-			fmt.Println("create file error : ", err)
-			return
-		}
-		defer f.Close()
-		resp, err := crm.HttpClient.Get(CAPURL)
-		if err != nil {
-			fmt.Println("http get error : ", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		io.Copy(f, resp.Body)
-	})
-	return nil
-}
 
 // 验证码去则色输出 阈值..34000
 func ImageClean(in, out string, threshole int) error {

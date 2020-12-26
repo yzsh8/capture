@@ -4,15 +4,22 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"reflect"
 	"strconv"
 )
 
 // 脚的 定义成内嵌 [][]int 的struct更方便,懒得改了
-type BinaryImage [][]int
+type BinaryImage struct {
+	Bin [][]int
+}
 
 // !panic
-func (bi BinaryImage) String() string {
-	binimg := [][]int(bi)
+func (bi *BinaryImage) String() string {
+	binimg := bi.Bin
+
+	//调试
+	fmt.Println(reflect.TypeOf(binimg).String(), len(binimg))
+
 	h := len(binimg)
 	if h < 1 {
 		panic("len(binimg) < 1")
@@ -24,8 +31,8 @@ func (bi BinaryImage) String() string {
 	return bi.RectString(image.Rect(0, 0, w-1, h-1))
 }
 
-func (bi BinaryImage) RectString(rect image.Rectangle) string {
-	binimg := [][]int(bi)
+func (bi *BinaryImage) RectString(rect image.Rectangle) string {
+	binimg := bi.Bin
 	buf := bytes.NewBuffer(nil)
 	for y, maxy := rect.Min.Y, rect.Max.Y; y <= maxy; y++ {
 		for x, maxx := rect.Min.X, rect.Max.X; x <= maxx; x++ {
@@ -37,8 +44,10 @@ func (bi BinaryImage) RectString(rect image.Rectangle) string {
 }
 
 // 返回sub BinaryImage
-func (bi BinaryImage) SubBinaryImage(rect image.Rectangle) BinaryImage {
-	binimg := BinaryImage(bi)
+func (bi *BinaryImage) SubBinaryImage(rect image.Rectangle) BinaryImage {
+	binimg := bi.Bin
+	newBi := new(BinaryImage)
+
 	h, w := rect.Size().Y+1, rect.Size().X+1
 
 	// init
@@ -51,13 +60,16 @@ func (bi BinaryImage) SubBinaryImage(rect image.Rectangle) BinaryImage {
 	for y := 0; y < h; y++ {
 		copy(newbi[y], binimg[rect.Min.Y+y][rect.Min.X:rect.Max.X+1])
 	}
-	return BinaryImage(newbi)
+	newBi.Bin = newbi
+
+	return *newBi
 }
 
 // !panic 数组越界 返回切割成n块的区域
-func (bi BinaryImage) CropRect(n int) []image.Rectangle {
+func (bi *BinaryImage) CropRect(n int) []image.Rectangle {
 	rectes := make([]image.Rectangle, n, n)
-	binimg := [][]int(bi)
+	binimg := bi.Bin
+
 	maxY := len(binimg)
 	if maxY == 0 {
 		panic("empty binaryimage : h == 0")
@@ -118,17 +130,13 @@ func (bi BinaryImage) CropRect(n int) []image.Rectangle {
 		maxXs = append(maxXs, maxX-1)
 	}
 
-	if len(maxXs) != 6 || len(minXs) != 6 {
-		panic(fmt.Sprintf("len(maxXs) = %d || len(minXs) = %d", len(maxXs), len(minXs)))
-	}
-
-	for i := 0; i < 6; i++ {
+	for i := 0; i < len(maxXs); i++ {
 		rectes[i] = image.Rectangle{image.Point{minXs[i], 0}, image.Point{maxXs[i], 0}}
 	}
 
 	// 针对每个x区域扫描y
 	YS := make([]bool, maxY, maxY)
-	for i := 0; i < 6; i++ {
+	for i := 0; i < len(maxXs); i++ {
 
 		for y := 0; y < maxY; y++ {
 			for x := rectes[i].Min.X; x < rectes[i].Max.X; x++ {
@@ -170,7 +178,7 @@ func (bi BinaryImage) CropRect(n int) []image.Rectangle {
 }
 
 // !panic 返回n块复制的切割区域
-func (bi BinaryImage) CropSubImg(n int) []BinaryImage {
+func (bi *BinaryImage) CropSubImg(n int) []BinaryImage {
 	rectes := bi.CropRect(n)
 	subbis := make([]BinaryImage, n, n)
 	for i := 0; i < n; i++ {
@@ -179,7 +187,8 @@ func (bi BinaryImage) CropSubImg(n int) []BinaryImage {
 	return subbis
 }
 
-func (bi BinaryImage) CropSubImgNoPanic(n int) (subbis []BinaryImage) {
+//切割区域
+func (bi *BinaryImage) CropSubImgNoPanic(n int) (subbis []BinaryImage) {
 	subbis = make([]BinaryImage, n, n)
 	defer func() {
 		if recover() != nil {
@@ -190,8 +199,8 @@ func (bi BinaryImage) CropSubImgNoPanic(n int) (subbis []BinaryImage) {
 }
 
 // !panic(未检测BinaryImage是否为空) 计算相似度 <= 5 相似 大于 10 不同
-func (bi BinaryImage) Similarity(anobi BinaryImage) int {
-	a, b := [][]int(bi), [][]int(anobi)
+func (bi *BinaryImage) Similarity(anobi BinaryImage) int {
+	a, b := bi.Bin, anobi.Bin
 	var h, w int
 	if ha, hb := len(a), len(b); ha < hb {
 		h = ha
@@ -210,8 +219,8 @@ func (bi BinaryImage) Similarity(anobi BinaryImage) int {
 }
 
 // !panic(未检测BinaryImage是否为空) 计算指纹
-func (bi BinaryImage) FingerPrint(h, w int) []byte {
-	binimg := [][]int(bi)
+func (bi *BinaryImage) FingerPrint(h, w int) []byte {
+	binimg := bi.Bin
 	var (
 		sum float32
 		avg float32

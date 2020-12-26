@@ -6,7 +6,9 @@ import (
 	"encoding/gob"
 	"fmt"
 	"image"
-	"image/jpeg"
+
+	//	"image/jpeg"
+	"image/png"
 	"os"
 )
 
@@ -30,7 +32,7 @@ func ReadImg(imgFile string) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	img, err := jpeg.Decode(f)
+	img, err := png.Decode(f)
 	if err != nil {
 		return nil, err
 	}
